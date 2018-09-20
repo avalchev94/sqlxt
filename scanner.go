@@ -34,8 +34,8 @@ func (s *Scanner) Scan(dest interface{}) error {
 }
 
 func (s *Scanner) scanAllRows(buffer *buffer) error {
-	for row := 0; s.rows.Next(); row++ {
-		rowBuffer, err := buffer.Index(row)
+	for s.rows.Next() {
+		rowBuffer, err := buffer.Next()
 		if err != nil {
 			return err
 		}
@@ -54,12 +54,12 @@ func (s *Scanner) scanOneRow(buffer *buffer) error {
 		return err
 	}
 
-	args := make([]reflect.Value, len(columnTypes))
+	rowData := make([]reflect.Value, len(columnTypes))
 	for i, t := range columnTypes {
-		args[i] = reflect.New(t.ScanType())
+		rowData[i] = reflect.New(t.ScanType())
 	}
 
-	result := reflect.ValueOf(s.rows.Scan).Call(args)
+	result := reflect.ValueOf(s.rows.Scan).Call(rowData)
 	// database/sql Scan returns only one variable - error
 	if !result[0].IsNil() {
 		return result[0].Interface().(error)
@@ -70,5 +70,5 @@ func (s *Scanner) scanOneRow(buffer *buffer) error {
 		return err
 	}
 
-	return buffer.MapRow(args, columns)
+	return buffer.AddRow(rowData, columns)
 }

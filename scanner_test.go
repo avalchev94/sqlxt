@@ -37,13 +37,16 @@ func Test(t *testing.T) {
 
 	_, err = db.Exec("INSERT INTO users (name, password) VALUES ($1,$2)", "avalchev94", "github")
 	assert.NoError(err)
+	_, err = db.Exec("INSERT INTO users (name, password) VALUES ($1,$2)", "avalchev", "linkedin")
+	assert.NoError(err)
 
 	rows, err := db.Query("SELECT * FROM users")
 
-	var user User
-	err = NewScanner(rows).Scan(&user)
+	var users []User
+	err = NewScanner(rows).Scan(&users)
 	assert.NoError(err)
-	fmt.Println(user)
+	fmt.Println(users)
+	fmt.Println(len(users))
 
 	_, err = db.Exec("DROP TABLE users")
 	assert.NoError(err)

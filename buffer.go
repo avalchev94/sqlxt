@@ -7,15 +7,14 @@ import (
 )
 
 type buffer struct {
-	refType   reflect.Type
-	refValue  reflect.Value
-	dimension int
+	Type      reflect.Type
+	Value     reflect.Value
+	Dimension int
 }
 
 func newBuffer(i interface{}) (*buffer, error) {
 	refValue := reflect.ValueOf(i)
 	refType := reflect.TypeOf(i)
-
 	if !isAllowed(refType.Kind()) {
 		return nil, fmt.Errorf("%v is not supported type", refType)
 	}
@@ -27,20 +26,33 @@ func newBuffer(i interface{}) (*buffer, error) {
 	}
 
 	return &buffer{
-		refType:   refType,
-		refValue:  refValue,
-		dimension: calculateDimension(refType)}, nil
+		Type:      refType,
+		Value:     refValue,
+		Dimension: calculateDimension(refType)}, nil
 }
 
 func (b *buffer) OneRowExpected() bool {
-	return b.dimension <= 1
+	return b.Dimension <= 1
 }
 
-func (b *buffer) Index(index int) (*buffer, error) {
-	return nil, nil
+func (b *buffer) Next() (*buffer, error) {
+	if b.Dimension <= 1 {
+		return nil, errors.New("buffer dimension is <=1")
+	}
+
+	switch b.Type.Kind() {
+	case reflect.Slice:
+		sliceType := b.Type.Elem()
+		b.Value.Set(reflect.Append(b.Value, reflect.New(sliceType)))
+
+		lastElement := b.Value.Index(b.Value.Len() - 1)
+		return newBuffer(lastElement.Addr().Interface())
+	}
+
+	return nil, errors.New("unsupported")
 }
 
-func (b *buffer) MapRow(data []reflect.Value, columns []string) error {
+func (b *buffer) AddRow(data []reflect.Value, columns []string) error {
 	if len(data) == 0 || len(columns) == 0 {
 		return errors.New("insufficient data or columns")
 	}
@@ -50,21 +62,21 @@ func (b *buffer) MapRow(data []reflect.Value, columns []string) error {
 
 	//TODO what happens if dimension > 1
 
-	switch b.refType.Kind() {
+	switch b.Type.Kind() {
 	case reflect.Struct:
-		return b.mapToStruct(data, columns)
+		return b.addToStruct(data, columns)
 	}
 	return errors.New("unsupported")
 }
 
-func (b *buffer) mapToStruct(data []reflect.Value, columns []string) error {
+func (b *buffer) addToStruct(data []reflect.Value, columns []string) error {
 	fieldMap := make(map[string]reflect.Value)
-	for i := 0; i < b.refType.NumField(); i++ {
-		tag, ok := parseTag(b.refType.Field(i))
+	for i := 0; i < b.Type.NumField(); i++ {
+		tag, ok := parseTag(b.Type.Field(i))
 		if !ok {
 			continue
 		}
-		fieldMap[tag[0]] = b.refValue.Field(i)
+		fieldMap[tag[0]] = b.Value.Field(i)
 	}
 
 	for i, col := range columns {
