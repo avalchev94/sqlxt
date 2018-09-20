@@ -43,7 +43,7 @@ func (b *buffer) Next() (*buffer, error) {
 	switch b.Type.Kind() {
 	case reflect.Slice:
 		sliceType := b.Type.Elem()
-		b.Value.Set(reflect.Append(b.Value, reflect.New(sliceType)))
+		b.Value.Set(reflect.Append(b.Value, reflect.New(sliceType).Elem()))
 
 		lastElement := b.Value.Index(b.Value.Len() - 1)
 		return newBuffer(lastElement.Addr().Interface())
