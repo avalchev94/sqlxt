@@ -5,14 +5,24 @@ import (
 	"reflect"
 )
 
+// Scanner is a type that will Scan your query's result.
 type Scanner struct {
 	rows *sql.Rows
 }
 
+// NewScanner is a function for creating new Scanner.
+// Have in mind that Scanner is always successfully created, but
+// later Scan method could fail because of problems is 'rows'.
 func NewScanner(rows *sql.Rows) *Scanner {
 	return &Scanner{rows}
 }
 
+// Scan is the 'meat' of the package. It scan the 'rows' input into
+// the 'dest' parameter. Dest variable could be:
+// - primitive type(string, int, bool, interface{})
+// - struct (with or without 'sql' tags);
+// - map with key(int, string, interface{});
+// - slice in combination with some of the above types;
 func (s *Scanner) Scan(dest interface{}) error {
 	if err := s.rows.Err(); err != nil {
 		return err
