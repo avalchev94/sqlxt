@@ -1,12 +1,3 @@
-# sqlxt
-sqlxt is a golang package which provides a simple extension to `database/sql` standard package.\
-**It's still in development, so it must improve in the future with more features and tests.**
-
-# Usage
-For the whole example, go to [example/example.go](https://github.com/avalchev94/sqlxt/tree/master/example/example.go).\
-For more examples, go to [scanner_test.go](https://github.com/avalchev94/sqlxt/blob/master/scanner_test.go)
-
-```golang
 package main
 
 import (
@@ -16,8 +7,17 @@ import (
 	"os"
 
 	"github.com/avalchev94/sqlxt"
+
 	_ "github.com/lib/pq"
 )
+
+func connectDB() (*sql.DB, error) {
+	connString := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
+		os.Getenv("PG_HOST"), os.Getenv("PG_PORT"), os.Getenv("PG_USER"),
+		os.Getenv("PG_PASSWORD"), "sqlorm")
+
+	return sql.Open("postgres", connString)
+}
 
 func testMap(db *sql.DB) {
 	rows, err := db.Query("SELECT * FROM newspapers")
@@ -55,18 +55,34 @@ func testStruct(db *sql.DB) {
 
 func main() {
 	db, err := connectDB()
-  
-  ...
-  ...
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer func() {
+		db.Exec("DROP TABLE newspapers")
+		db.Close()
+	}()
+
+	_, err = db.Exec(`
+	CREATE TABLE newspapers
+	(
+		id SERIAL PRIMARY KEY,
+		title varchar(100) NOT NULL,
+		country varchar(100) NOT NULL
+	)`)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	_, err = db.Exec("INSERT INTO newspapers (title, country) VALUES ($1, $2), ($3, $4)",
+		"The Guardian", "United Kingdom",
+		"Trud", "Bulgaria")
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	testMap(db)
 	testStruct(db)
+
+	db.Exec("DROP TABLE newspapers")
 }
-
-```
-
-# Install
-
-```bash
-go get -u github.com/avalchev94/sqlxt
-```
