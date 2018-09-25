@@ -83,6 +83,4 @@ func main() {
 
 	testMap(db)
 	testStruct(db)
-
-	db.Exec("DROP TABLE newspapers")
 }

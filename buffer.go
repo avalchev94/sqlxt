@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 type buffer struct {
@@ -77,19 +78,35 @@ func (b *buffer) AddRow(data []reflect.Value, columns []string) error {
 func (b *buffer) addToStruct(data []reflect.Value, columns []string) error {
 	fieldMap := make(map[string]reflect.Value)
 	for i := 0; i < b.Type.NumField(); i++ {
+		// the fields that can't be set are the not exported
+		if !b.Value.Field(i).CanSet() {
+			continue
+		}
+
 		tag, ok := parseTag(b.Type.Field(i))
 		if !ok {
 			continue
 		}
-		fieldMap[tag[0]] = b.Value.Field(i)
+		fieldMap[strings.ToLower(tag[0])] = b.Value.Field(i)
 	}
-	//TODO: typesafety
+
 	for i, col := range columns {
-		field, ok := fieldMap[col]
+		field, ok := fieldMap[strings.ToLower(col)]
 		if !ok {
 			continue
 		}
-		field.Set(data[i].Elem())
+
+		fieldType := field.Type()
+		dataType := data[i].Elem().Type()
+		switch {
+		case fieldType.AssignableTo(dataType):
+			field.Set(data[i].Elem())
+		case fieldType.ConvertibleTo(dataType):
+			converted := data[i].Elem().Convert(fieldType)
+			field.Set(converted)
+		default:
+			return fmt.Errorf("%v is not assignable/convertible to %v", dataType, fieldType)
+		}
 	}
 	return nil
 }
@@ -163,7 +180,7 @@ func (b *buffer) addToMap(data []reflect.Value, columns []string) error {
 }
 
 func isAllowed(kind reflect.Kind) bool {
-	return kind == reflect.Ptr || kind == reflect.Map || kind == reflect.Slice
+	return kind == reflect.Ptr || kind == reflect.Map
 }
 
 func calculateDimension(t reflect.Type) int {
