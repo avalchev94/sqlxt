@@ -98,14 +98,15 @@ func (b *buffer) addToSlice(data []reflect.Value) error {
 	sliceType := b.Type.Elem()
 	for _, d := range data {
 		dataType := d.Type().Elem()
-		if dataType.AssignableTo(sliceType) {
+		switch {
+		case dataType.AssignableTo(sliceType):
 			b.Value.Set(reflect.Append(b.Value, d.Elem()))
-		} else if dataType.ConvertibleTo(sliceType) {
+		case dataType.ConvertibleTo(sliceType):
 			converted := d.Elem().Convert(sliceType)
 			b.Value.Set(reflect.Append(b.Value, converted))
+		default:
+			return fmt.Errorf("%v is not assignable/convertible to %v", dataType, sliceType)
 		}
-
-		return fmt.Errorf("%v is not assignable/convertible to %v", dataType, sliceType)
 	}
 	return nil
 }
@@ -113,18 +114,17 @@ func (b *buffer) addToSlice(data []reflect.Value) error {
 func (b *buffer) addToPrimitive(data []reflect.Value) error {
 	dataType := data[0].Type().Elem()
 
-	if dataType.AssignableTo(b.Type) {
+	switch {
+	case dataType.AssignableTo(b.Type):
 		b.Value.Set(data[0].Elem())
-		return nil
-	}
-
-	if dataType.ConvertibleTo(b.Type) {
+	case dataType.ConvertibleTo(b.Type):
 		converted := data[0].Elem().Convert(b.Type)
 		b.Value.Set(converted)
-		return nil
+	default:
+		return fmt.Errorf("%v is not assignable/convertible to %v", dataType, b.Type)
 	}
 
-	return fmt.Errorf("%v is not assignable/convertible to %v", dataType, b.Type)
+	return nil
 }
 
 func (b *buffer) addToMap(data []reflect.Value, columns []string) error {
