@@ -64,18 +64,16 @@ func TestPrimitive(t *testing.T) {
 		{4, "SELECT password FROM users", interface{}("github")},
 		{5, "SELECT id FROM users", []int64{1}},
 		{6, "SELECT name, password FROM users", []string{"avalchev94", "github"}},
-		{7, "SELECT * FROM users", []interface{}{int32(1), "avalchev94", "github"}},
+		{7, "SELECT * FROM users", []interface{}{int64(1), "avalchev94", "github"}},
 		{8, "SELECT name, password FROM users", [][]string{
 			{"avalchev94", "github"},
 			{"avalchev", "linkedin"},
 		}},
 		{9, "SELECT * FROM users", [][]interface{}{
-			{int32(1), "avalchev94", "github"},
-			{int32(2), "avalchev", "linkedin"},
+			{int64(1), "avalchev94", "github"},
+			{int64(2), "avalchev", "linkedin"},
 		}},
-		{10, "SELECT id FROM users WHERE id=3", []int64(nil)},
 	}
-
 	for _, c := range cases {
 		rows, err := db.Query(c.query)
 		assert.NoError(err, "case %d", c.id)
@@ -168,7 +166,7 @@ func TestMap(t *testing.T) {
 		expected interface{}
 	}{
 		{1, "SELECT * FROM users", map[string]interface{}{
-			"id":       int32(1),
+			"id":       int64(1),
 			"name":     "avalchev94",
 			"password": "github",
 		}},
@@ -177,8 +175,8 @@ func TestMap(t *testing.T) {
 			1: "linkedin",
 		}},
 		{3, "SELECT * FROM users", []map[string]interface{}{
-			{"id": int32(1), "name": "avalchev94", "password": "github"},
-			{"id": int32(2), "name": "avalchev", "password": "linkedin"},
+			{"id": int64(1), "name": "avalchev94", "password": "github"},
+			{"id": int64(2), "name": "avalchev", "password": "linkedin"},
 		}},
 		{4, "SELECT * FROM users WHERE name='wrong_name'", []map[string]interface{}(nil)},
 	}
@@ -192,4 +190,11 @@ func TestMap(t *testing.T) {
 		assert.NoError(err, "case %d", c.id)
 		assert.Equal(c.expected, dest.Elem().Interface(), "case %d", c.id)
 	}
+}
+
+func TestScanWithNil(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.Error(NewScanner(nil).Scan(nil))
+	assert.Error(NewScanner(nil).Scan(map[int]string{}))
 }

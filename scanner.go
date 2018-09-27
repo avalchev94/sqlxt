@@ -2,6 +2,7 @@ package sqlxt
 
 import (
 	"database/sql"
+	"fmt"
 	"reflect"
 )
 
@@ -24,61 +25,65 @@ func NewScanner(rows *sql.Rows) *Scanner {
 // - map with key(int, string, interface{});
 // - slice in combination with some of the above types;
 func (s *Scanner) Scan(dest interface{}) error {
+	if s.rows == nil {
+		return fmt.Errorf(`sqlxt: sql "rows" is nil`)
+	}
+
 	if err := s.rows.Err(); err != nil {
 		return err
 	}
 
-	buffer, err := newBuffer(dest)
+	builder, err := newBuilder(dest)
 	if err != nil {
 		return err
 	}
-
-	if buffer.OneRowExpected() {
+	if builder.OneRowExpected() {
 		if !s.rows.Next() {
-			return s.rows.Err()
+			return sql.ErrNoRows
 		}
-		return s.scanOneRow(buffer)
+		return s.scanOneRow(builder)
 	}
 
-	return s.scanAllRows(buffer)
+	return s.scanAllRows(builder)
 }
 
-func (s *Scanner) scanAllRows(buffer *buffer) error {
+func (s *Scanner) scanAllRows(builder *builder) error {
+	rowsCount := 0
 	for s.rows.Next() {
-		rowBuffer, err := buffer.Next()
+		rowBuilder, err := builder.Next()
 		if err != nil {
 			return err
 		}
-		err = s.scanOneRow(rowBuffer)
+		err = s.scanOneRow(rowBuilder)
 		if err != nil {
 			return err
 		}
+
+		rowsCount++
 	}
 
+	if rowsCount == 0 {
+		return sql.ErrNoRows
+	}
 	return nil
 }
 
-func (s *Scanner) scanOneRow(buffer *buffer) error {
+func (s *Scanner) scanOneRow(builder *builder) error {
 	columnTypes, err := s.rows.ColumnTypes()
 	if err != nil {
 		return err
 	}
 
-	rowData := make([]reflect.Value, len(columnTypes))
-	for i, t := range columnTypes {
-		rowData[i] = reflect.New(t.ScanType())
+	params, err := builder.BuildParameters(columnTypes)
+	if err != nil {
+		return err
 	}
 
-	result := reflect.ValueOf(s.rows.Scan).Call(rowData)
+	result := reflect.ValueOf(s.rows.Scan).Call(params)
 	// database/sql Scan returns only one variable - error
 	if !result[0].IsNil() {
 		return result[0].Interface().(error)
 	}
 
-	columns, err := s.rows.Columns()
-	if err != nil {
-		return err
-	}
-
-	return buffer.AddRow(rowData, columns)
+	return builder.UpdateDestination(params, columnTypes)
 }

@@ -5,13 +5,26 @@ import (
 	"strings"
 )
 
-func parseTag(field reflect.StructField) ([]string, bool) {
-	tag, ok := field.Tag.Lookup("sql")
+type tag string
+
+func parseTag(field reflect.StructField) (*tag, bool) {
+	value, ok := field.Tag.Lookup("sql")
 	if !ok {
-		return []string{field.Name}, true
+		t := tag(field.Name)
+		return &t, true
 	}
-	if tag == "-" {
+	if value == "-" {
 		return nil, false
 	}
-	return strings.Split(tag, ","), true
+
+	t := tag(value)
+	return &t, true
+}
+
+func (t *tag) toLower() {
+	*t = tag(strings.ToLower(t.string()))
+}
+
+func (t *tag) string() string {
+	return string(*t)
 }
