@@ -20,13 +20,10 @@ func connectDB() (*sql.DB, error) {
 }
 
 func testMap(db *sql.DB) {
-	rows, err := db.Query("SELECT * FROM newspapers")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	newspapers := map[string]interface{}{}
-	if err := sqlxt.NewScanner(rows).Scan(newspapers); err != nil {
+
+	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
+	if err := scanner.Scan(newspapers); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -40,13 +37,10 @@ func testStruct(db *sql.DB) {
 		Country string `sql:"country"`
 	}
 
-	rows, err := db.Query("SELECT * FROM newspapers")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	newspapers := []Newspaper{}
-	if err := sqlxt.NewScanner(rows).Scan(&newspapers); err != nil {
+
+	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
+	if err := scanner.Scan(&newspapers); err != nil {
 		log.Fatalln(err)
 	}
 

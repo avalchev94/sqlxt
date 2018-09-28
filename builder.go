@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 type builder struct {
@@ -87,6 +89,13 @@ func (b *builder) BuildParameters(columns []*sql.ColumnType) ([]reflect.Value, e
 		parameters = make([]reflect.Value, len(columns))
 		for i := range parameters {
 			parameters[i] = reflect.New(valueType)
+		}
+	}
+
+	//TODO: move that in separate file; handle more databases
+	for i, p := range parameters {
+		if p.Kind() == reflect.Slice {
+			parameters[i] = reflect.ValueOf(pq.Array(parameters[i].Addr().Interface()))
 		}
 	}
 

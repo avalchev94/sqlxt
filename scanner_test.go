@@ -76,11 +76,11 @@ func TestPrimitive(t *testing.T) {
 	}
 	for _, c := range cases {
 		rows, err := db.Query(c.query)
-		assert.NoError(err, "case %d", c.id)
 
 		dest := reflect.New(reflect.TypeOf(c.expected))
-		err = NewScanner(rows).Scan(dest.Interface())
+		err = NewScanner(rows, err).Scan(dest.Interface())
 		assert.NoError(err, "case %d", c.id)
+
 		assert.Equal(c.expected, dest.Elem().Interface(), "case %d", c.id)
 	}
 }
@@ -138,16 +138,15 @@ func TestStruct(t *testing.T) {
 			{ID: 0, Name: ""},
 			{ID: 0, Name: ""},
 		}},
-		{8, "SELECT * FROM users WHERE id>2", []User(nil)},
 	}
 
 	for _, c := range cases {
 		rows, err := db.Query(c.query)
-		assert.NoError(err, "case %d", c.id)
 
 		dest := reflect.New(reflect.TypeOf(c.expected))
-		err = NewScanner(rows).Scan(dest.Interface())
+		err = NewScanner(rows, err).Scan(dest.Interface())
 		assert.NoError(err, "case %d", c.id)
+
 		assert.Equal(c.expected, dest.Elem().Interface(), "case %d", c.id)
 	}
 }
@@ -178,16 +177,15 @@ func TestMap(t *testing.T) {
 			{"id": int64(1), "name": "avalchev94", "password": "github"},
 			{"id": int64(2), "name": "avalchev", "password": "linkedin"},
 		}},
-		{4, "SELECT * FROM users WHERE name='wrong_name'", []map[string]interface{}(nil)},
 	}
 
 	for _, c := range cases {
 		rows, err := db.Query(c.query)
-		assert.NoError(err, "case %d", c.id)
 
 		dest := reflect.New(reflect.TypeOf(c.expected))
-		err = NewScanner(rows).Scan(dest.Interface())
+		err = NewScanner(rows, err).Scan(dest.Interface())
 		assert.NoError(err, "case %d", c.id)
+
 		assert.Equal(c.expected, dest.Elem().Interface(), "case %d", c.id)
 	}
 }
@@ -195,6 +193,6 @@ func TestMap(t *testing.T) {
 func TestScanWithNil(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Error(NewScanner(nil).Scan(nil))
-	assert.Error(NewScanner(nil).Scan(map[int]string{}))
+	assert.Error(NewScanner(nil, nil).Scan(nil))
+	assert.Error(NewScanner(nil, fmt.Errorf("error")).Scan(map[int]string{}))
 }

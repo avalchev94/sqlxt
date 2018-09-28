@@ -9,13 +9,14 @@ import (
 // Scanner is a type that will Scan your query's result.
 type Scanner struct {
 	rows *sql.Rows
+	err  error
 }
 
 // NewScanner is a function for creating new Scanner.
 // Have in mind that Scanner is always successfully created, but
 // later Scan method could fail because of problems is 'rows'.
-func NewScanner(rows *sql.Rows) *Scanner {
-	return &Scanner{rows}
+func NewScanner(rows *sql.Rows, err error) *Scanner {
+	return &Scanner{rows, err}
 }
 
 // Scan is the 'meat' of the package. It scan the 'rows' input into
@@ -25,12 +26,13 @@ func NewScanner(rows *sql.Rows) *Scanner {
 // - map with key(int, string, interface{});
 // - slice in combination with some of the above types;
 func (s *Scanner) Scan(dest interface{}) error {
-	if s.rows == nil {
+	switch {
+	case s.err != nil:
+		return s.err
+	case s.rows == nil:
 		return fmt.Errorf(`sqlxt: sql "rows" is nil`)
-	}
-
-	if err := s.rows.Err(); err != nil {
-		return err
+	case s.rows.Err() != nil:
+		return s.rows.Err()
 	}
 
 	builder, err := newBuilder(dest)
