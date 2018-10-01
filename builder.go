@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/lib/pq"
 )
@@ -125,20 +124,14 @@ func (b *builder) UpdateDestination(params []reflect.Value, columns []*sql.Colum
 }
 
 func (b *builder) structParameters(columns []*sql.ColumnType) []reflect.Value {
-	// fieldsMap will map the struct fields:
-	// ["field tag"] = []reflect.Value{all, fields, having, this, tag}
-	fieldsMap := map[string][]reflect.Value{}
-	parseStruct(b.Value, fieldsMap)
+	parser := newStructParser()
+	parser.Parse(b.Value)
 
 	parameters := make([]reflect.Value, len(columns))
 	for i, col := range columns {
-		fields, ok := fieldsMap[strings.ToLower(col.Name())]
-		if !ok || len(fields) == 0 {
-			continue
+		if field, ok := parser.Field(strings.ToLower(col.Name())); ok {
+			parameters[i] = field
 		}
-
-		parameters[i] = fields[0]
-		fieldsMap[strings.ToLower(col.Name())] = fields[1:]
 	}
 
 	// add valid value for the missing parameters
@@ -200,61 +193,4 @@ func calculateDimension(t reflect.Type) int {
 func scannerImplemented(v reflect.Value) bool {
 	_, ok := v.Interface().(sql.Scanner)
 	return ok
-}
-
-func parseStruct(structValue reflect.Value, fields map[string][]reflect.Value) {
-	addField := func(t *tag, fieldValue reflect.Value) {
-		// if ok, we already have such tag
-		if field, ok := fields[t.string()]; ok {
-			fields[t.string()] = append(field, fieldValue)
-		} else {
-			fields[t.string()] = []reflect.Value{fieldValue}
-		}
-	}
-
-	structType := structValue.Type()
-	for i := 0; i < structType.NumField(); i++ {
-		fieldValue := structValue.Field(i)
-
-		// skip unexported fields
-		if !fieldValue.CanSet() {
-			continue
-		}
-
-		// parse tag, skip the invalid
-		tag, ok := parseTag(structType.Field(i))
-		if !ok {
-			continue
-		}
-		tag.toLower()
-
-		// if sql.scanner is implemented, add the field.
-		if scannerImplemented(fieldValue) {
-			addField(tag, fieldValue)
-			continue
-		}
-
-		// or the field type is time.Time
-		switch fieldValue.Interface().(type) {
-		case time.Time, *time.Time:
-			addField(tag, fieldValue)
-			continue
-		}
-
-		fieldType := fieldValue.Type()
-		if fieldType.Kind() == reflect.Ptr {
-			fieldType = fieldType.Elem()
-		}
-
-		switch fieldType.Kind() {
-		case reflect.Struct:
-			if fieldValue.IsNil() {
-				fieldValue.Set(reflect.New(fieldType))
-				fieldValue = fieldValue.Elem()
-			}
-			parseStruct(fieldValue, fields)
-		default:
-			addField(tag, fieldValue)
-		}
-	}
 }
