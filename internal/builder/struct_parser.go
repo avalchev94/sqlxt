@@ -1,4 +1,4 @@
-package sqlxt
+package builder
 
 import (
 	"reflect"

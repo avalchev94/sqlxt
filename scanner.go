@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+
+	"github.com/avalchev94/sqlxt/internal/builder"
 )
 
 // Scanner is a type that will Scan your query's result.
@@ -35,7 +37,7 @@ func (s *Scanner) Scan(dest interface{}) error {
 		return s.rows.Err()
 	}
 
-	builder, err := newBuilder(dest)
+	builder, err := builder.New(dest)
 	if err != nil {
 		return err
 	}
@@ -49,18 +51,23 @@ func (s *Scanner) Scan(dest interface{}) error {
 	return s.scanAllRows(builder)
 }
 
-func (s *Scanner) scanAllRows(builder *builder) error {
+func (s *Scanner) scanAllRows(builder *builder.Builder) error {
 	rowsCount := 0
 	for s.rows.Next() {
 		rowBuilder, err := builder.Next()
 		if err != nil {
 			return err
 		}
+
 		err = s.scanOneRow(rowBuilder)
 		if err != nil {
 			return err
 		}
 
+		err = builder.Add(rowBuilder)
+		if err != nil {
+			return err
+		}
 		rowsCount++
 	}
 
@@ -70,13 +77,13 @@ func (s *Scanner) scanAllRows(builder *builder) error {
 	return nil
 }
 
-func (s *Scanner) scanOneRow(builder *builder) error {
+func (s *Scanner) scanOneRow(builder *builder.Builder) error {
 	columnTypes, err := s.rows.ColumnTypes()
 	if err != nil {
 		return err
 	}
 
-	params, err := builder.BuildParameters(columnTypes)
+	params, err := builder.Parameters(columnTypes)
 	if err != nil {
 		return err
 	}
@@ -87,5 +94,5 @@ func (s *Scanner) scanOneRow(builder *builder) error {
 		return result[0].Interface().(error)
 	}
 
-	return builder.UpdateDestination(params, columnTypes)
+	return builder.Update(params, columnTypes)
 }

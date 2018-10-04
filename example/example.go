@@ -11,51 +11,17 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func connectDB() (*sql.DB, error) {
+func setupDB() *sql.DB {
 	connString := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
 		os.Getenv("PG_HOST"), os.Getenv("PG_PORT"), os.Getenv("PG_USER"),
 		os.Getenv("PG_PASSWORD"), "sqlorm")
 
-	return sql.Open("postgres", connString)
-}
-
-func testMap(db *sql.DB) {
-	newspapers := map[string]interface{}{}
-
-	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
-	if err := scanner.Scan(newspapers); err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println(newspapers)
-}
-
-func testStruct(db *sql.DB) {
-	type Newspaper struct {
-		ID      int32  `sql:"id"`
-		Title   string `sql:"title"`
-		Country string `sql:"country"`
-	}
-
-	newspapers := []Newspaper{}
-
-	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
-	if err := scanner.Scan(&newspapers); err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println(newspapers)
-}
-
-func main() {
-	db, err := connectDB()
+	db, err := sql.Open("postgres", connString)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer func() {
-		db.Exec("DROP TABLE newspapers")
-		db.Close()
-	}()
+
+	db.Exec("DROP TABLE newspapers")
 
 	_, err = db.Exec(`
 	CREATE TABLE newspapers
@@ -75,6 +41,68 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	return db
+}
+
+func closeDB(db *sql.DB) {
+	db.Exec("DROP TABLE newspapers")
+	db.Close()
+}
+
+func testMap(db *sql.DB) {
+	newspapers := map[string]interface{}{}
+
+	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
+	if err := scanner.Scan(&newspapers); err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println(newspapers)
+}
+
+// Newspaper is a example structure with 'sql' tags
+type Newspaper struct {
+	ID      int32  `sql:"id"`
+	Title   string `sql:"title"`
+	Country string `sql:"country"`
+}
+
+func testStruct(db *sql.DB) {
+	var newspapers []Newspaper
+
+	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
+	if err := scanner.Scan(&newspapers); err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println(newspapers)
+}
+
+func testChan(db *sql.DB) {
+	newspapers := make(chan Newspaper)
+	go func() {
+		for n := range newspapers {
+			fmt.Println(n)
+		}
+	}()
+
+	scanner := sqlxt.NewScanner(db.Query("SELECT * FROM newspapers"))
+	if err := scanner.Scan(&newspapers); err != nil {
+		log.Fatalln(err)
+	}
+	close(newspapers)
+}
+
+func main() {
+	db := setupDB()
+	defer closeDB(db)
+
+	fmt.Println("Map example:")
 	testMap(db)
+
+	fmt.Println("\nStruct example:")
 	testStruct(db)
+
+	fmt.Println("\nChannel example:")
+	testChan(db)
 }
